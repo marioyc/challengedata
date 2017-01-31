@@ -21,7 +21,24 @@ def load_input_file(filename, ninput, firstID):
     starts.append(len(aux))
 
     for i in range(ninput):
-        X.append(aux[starts[i]:starts[i + 1]])
+        entry = aux[starts[i]:starts[i + 1]]
+        tokens = entry.split(';')
+        ntokens = len(tokens)
+
+        content = ""
+        for j in range(1,ntokens - 3):
+            if j > 1:
+                content += " "
+            content += tokens[j]
+
+        d = {}
+        d['id'] = int(tokens[0])
+        d['content'] = content
+        d['title'] = tokens[-3]
+        d['stars'] = tokens[-2]
+        d['product'] = tokens[-1]
+
+        X.append(d)
 
     return X
 
