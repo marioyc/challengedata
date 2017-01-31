@@ -24,6 +24,63 @@ def parseArguments():
 
 #### FEATURE EXTRACTION METHODS ####
 
+def feature2(X):
+    embedding_data = pickle.load(open('data/polyglot-fr.pkl', 'rb'))
+    word_embedding = {}
+
+    for i in range(len(embedding_data[0])):
+        word_embedding[ embedding_data[0][i] ] = embedding_data[1][i]
+
+    n = len(X)
+    ret = numpy.zeros((n,131))
+
+    stop = set(nltk.corpus.stopwords.words('french'))
+
+    for i in range(n):
+        ### review content
+        tokens = nltk.word_tokenize(X[i]['content'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        embedding = numpy.zeros(64)
+        cont = 0
+        for token in tokens:
+            if token in word_embedding:
+                embedding += word_embedding[token]
+                cont += 1
+        if cont == 0:
+            #print tokens
+            pass
+        else:
+            embedding /= cont
+
+        ret[i, 0:64] = embedding
+        ret[i,64] = cont
+
+        ### review title
+        tokens = nltk.word_tokenize(X[i]['title'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        embedding = numpy.zeros(64)
+        cont = 0
+        for token in tokens:
+            if token in word_embedding:
+                embedding += word_embedding[token]
+                cont += 1
+        if cont == 0:
+            #print tokens
+            pass
+        else:
+            embedding /= cont
+
+        ret[i, 65:129] = embedding
+        ret[i,129] = cont
+
+        ret[i, 130] = X[i]['stars']
+
+    return ret
+
 def process_input(X):
     embedding_data = pickle.load(open('data/polyglot-fr.pkl', 'rb'))
     word_embedding = {}
@@ -71,8 +128,11 @@ def main():
 
     Xtrain, Xtest, Ytrain = load_data()
 
-    Xtrain = process_input(Xtrain)
-    Xtest = process_input(Xtest)
+
+    ##### Processing
+    Xtrain = feature2(Xtrain)
+    Xtest = feature2(Xtest)
+    #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
     print "train features saved at: %s" % os.path.join(output_folder,output_prefix + '_train.npy')
