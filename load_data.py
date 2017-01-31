@@ -33,8 +33,8 @@ def load_input_file(filename, ninput, firstID):
 
         d = {}
         d['id'] = int(tokens[0])
-        d['content'] = content
-        d['title'] = tokens[-3]
+        d['content'] = content.decode('utf-8')
+        d['title'] = tokens[-3].decode('utf-8')
         d['stars'] = tokens[-2]
         d['product'] = tokens[-1]
 
