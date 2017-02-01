@@ -1,6 +1,7 @@
 import nltk
 import numpy
 import pickle
+import word2vec
 from load_data import load_data
 from lib import method1
 import os
@@ -25,6 +26,7 @@ def parseArguments():
 #### FEATURE EXTRACTION METHODS ####
 
 def feature2(X):
+    print "method of feature extraction: feature2"
     embedding_data = pickle.load(open('data/polyglot-fr.pkl', 'rb'))
     word_embedding = {}
 
@@ -81,6 +83,61 @@ def feature2(X):
 
     return ret
 
+def feature3(X, model_filename, dim):
+    print "method of feature extraction: feature3"
+    print "model filename: %s" % model_filename
+    model = word2vec.load(model_filename)
+
+    n = len(X)
+    ret = numpy.zeros((n,2 * dim + 3))
+
+    stop = set(nltk.corpus.stopwords.words('french'))
+
+    for i in range(n):
+        ### review content
+        tokens = nltk.word_tokenize(X[i]['content'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        embedding = numpy.zeros(dim)
+        cont = 0
+        for token in tokens:
+            if token in model:
+                embedding += model[token]
+                cont += 1
+        if cont == 0:
+            #print tokens
+            pass
+        else:
+            embedding /= cont
+
+        ret[i, 0:dim] = embedding
+        ret[i,dim] = cont
+
+        ### review title
+        tokens = nltk.word_tokenize(X[i]['title'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        embedding = numpy.zeros(dim)
+        cont = 0
+        for token in tokens:
+            if token in model:
+                embedding += model[token]
+                cont += 1
+        if cont == 0:
+            #print tokens
+            pass
+        else:
+            embedding /= cont
+
+        ret[i, dim + 1:2 * dim + 1] = embedding
+        ret[i,2 * dim + 1] = cont
+
+        ret[i, 2 * dim + 2] = X[i]['stars']
+
+    return ret
+
 def process_input(X):
     embedding_data = pickle.load(open('data/polyglot-fr.pkl', 'rb'))
     word_embedding = {}
@@ -130,8 +187,8 @@ def main():
 
 
     ##### Processing
-    Xtrain = feature2(Xtrain)
-    Xtest = feature2(Xtest)
+    Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
+    Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
