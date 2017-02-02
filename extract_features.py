@@ -187,8 +187,10 @@ def main():
 
 
     ##### Processing
-    Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
-    Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
+    Xtrain = feature2(Xtrain)
+    Xtest = feature2(Xtest)
+    #Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
+    #Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
