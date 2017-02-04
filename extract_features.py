@@ -22,6 +22,40 @@ def parseArguments():
     args = parser.parse_args()
     return args
 
+def IDF(X):
+    print "Computing IDF"
+    n = len(X)
+    stop = set(nltk.corpus.stopwords.words('french'))
+    df = {}
+
+    for i in range(n):
+        ### review content
+        tokens = nltk.word_tokenize(X[i]['content'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        for token in tokens:
+            if token in df:
+                df[token] += 1
+            else:
+                df[token] = 1
+
+        ### review title
+        tokens = nltk.word_tokenize(X[i]['title'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        for token in tokens:
+            if token in df:
+                df[token] += 1
+            else:
+                df[token] = 1
+
+    word2idf = {}
+    for k,v in df.iteritems():
+        word2idf[k] = numpy.log(float(n) / v)
+
+    return word2idf
 
 #### FEATURE EXTRACTION METHODS ####
 
@@ -83,7 +117,7 @@ def feature2(X):
 
     return ret
 
-def feature3(X, model_filename, dim):
+def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
     print "method of feature extraction: feature3"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
@@ -100,19 +134,26 @@ def feature3(X, model_filename, dim):
         tokens = [w for w in tokens if not w in stop]
 
         embedding = numpy.zeros(dim)
-        cont = 0
+        sum_weights = 0
         for token in tokens:
             if token in model:
-                embedding += model[token]
-                cont += 1
-        if cont == 0:
+                if use_idf:
+                    if token in word2idf:
+                        embedding += word2idf[token] * model[token]
+                        sum_weights += word2idf[token]
+                    else:
+                        print token
+                else:
+                    embedding += model[token]
+                    sum_weights += 1
+        if sum_weights == 0:
             #print tokens
             pass
         else:
-            embedding /= cont
+            embedding /= sum_weights
 
         ret[i, 0:dim] = embedding
-        ret[i,dim] = cont
+        ret[i,dim] = sum_weights
 
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
@@ -120,19 +161,27 @@ def feature3(X, model_filename, dim):
         tokens = [w for w in tokens if not w in stop]
 
         embedding = numpy.zeros(dim)
-        cont = 0
+        sum_weights = 0
         for token in tokens:
             if token in model:
-                embedding += model[token]
-                cont += 1
-        if cont == 0:
+                if use_idf:
+                    if token in word2idf:
+                        embedding += word2idf[token] * model[token]
+                        sum_weights += word2idf[token]
+                    else:
+                        #print token
+                        pass
+                else:
+                    embedding += model[token]
+                    sum_weights += 1
+        if sum_weights == 0:
             #print tokens
             pass
         else:
-            embedding /= cont
+            embedding /= sum_weights
 
         ret[i, dim + 1:2 * dim + 1] = embedding
-        ret[i,2 * dim + 1] = cont
+        ret[i,2 * dim + 1] = sum_weights
 
         ret[i, 2 * dim + 2] = X[i]['stars']
 
@@ -187,8 +236,9 @@ def main():
 
 
     ##### Processing
-    Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
-    Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
+    word2idf = IDF(Xtrain)
+    Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200, True, word2idf)
+    Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200, True, word2idf)
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
