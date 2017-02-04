@@ -33,6 +33,7 @@ def IDF(X):
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
+        tokens = numpy.unique(tokens)
 
         for token in tokens:
             if token in df:
@@ -44,6 +45,7 @@ def IDF(X):
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
+        tokens = numpy.unique(tokens)
 
         for token in tokens:
             if token in df:
@@ -142,7 +144,8 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
                         embedding += word2idf[token] * model[token]
                         sum_weights += word2idf[token]
                     else:
-                        print token
+                        #print token
+                        pass
                 else:
                     embedding += model[token]
                     sum_weights += 1
@@ -234,11 +237,17 @@ def main():
 
     Xtrain, Xtest, Ytrain = load_data()
 
-
     ##### Processing
-    word2idf = IDF(Xtrain)
-    Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200, True, word2idf)
-    Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200, True, word2idf)
+    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
+    use_idf = True
+
+    if use_idf:
+        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+        Xtrain = feature3(Xtrain, word2vec_model, 200, True, word2idf)
+        Xtest = feature3(Xtest, word2vec_model, 200, True, word2idf)
+    else:
+        Xtrain = feature3(Xtrain, word2vec_model, 200)
+        Xtest = feature3(Xtest, word2vec_model, 200)
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
