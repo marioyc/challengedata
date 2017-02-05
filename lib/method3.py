@@ -22,19 +22,25 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
     dval = xgb.DMatrix(Xtrain_test, label=Ytrain_test)
     eval_set = [(Xtrain_train, Ytrain_train), (Xtrain_test, Ytrain_test)]
 
-    n_estimators = 150
-    max_depth = 5
+    params = {
+        'n_estimators' : 1000,
+        'max_depth' : 8,
+        'learning_rate' : 0.01,
+        'gamma' : 1,
+        'subsample' : 0.8,
+        'colsample_bytree' : 0.8,
+        #'reg_lambda' : 3,
+    }
 
     print "-------- PARAMETERS --------"
-    print "n_estimators: %d" % n_estimators
-    print "max_depth:    %d" % max_depth
+    for k,v in params.iteritems():
+        print "%s: %f" % (k, v)
     print "----------------------------"
 
-    model = xgb.XGBClassifier(n_estimators=n_estimators, max_depth=max_depth)
+    model = xgb.XGBClassifier(**params)
 
     print "-------- fitting on the train_train data"
 
-    #num_round = 50
     model.fit(Xtrain_train, Ytrain_train, eval_set=eval_set, eval_metric='auc', early_stopping_rounds=10)
     evals_result = model.evals_result()
 
@@ -47,6 +53,11 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
 
     #xgb.plot_importance(model)
     plt.show()
+
+	print "-------- fitting on the whole train data"
+
+    model = xgb.XGBClassifier(**params)
+    model.fit(Xtrain, Ytrain, eval_metric='auc')
 
     print "-------- predict probabilities"
 
