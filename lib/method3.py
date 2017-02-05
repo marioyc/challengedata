@@ -54,7 +54,7 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
     #xgb.plot_importance(model)
     plt.show()
 
-	print "-------- fitting on the whole train data"
+    print "-------- fitting on the whole train data"
 
     model = xgb.XGBClassifier(**params)
     model.fit(Xtrain, Ytrain, eval_metric='auc')
