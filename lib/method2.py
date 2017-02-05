@@ -17,7 +17,17 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
 	Xtrain_train = Xtrain[:split_idx,:]
 	Xtrain_test = Xtrain[split_idx:,:]
 
-	model = RandomForestClassifier(n_estimators=5)
+	n_estimators = 1500
+	max_depth = 30
+	n_jobs = 2
+
+	print "-------- PARAMETERS --------"
+	print "n_estimators: %d" % n_estimators
+	print "max_depth:    %d" % max_depth
+	print "n_jobs:       %d" % n_jobs
+	print "----------------------------"
+
+	model = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth, n_jobs=n_jobs)
 
 	print "-------- fitting on the train_train data"
 	model = model.fit(Xtrain_train, Ytrain_train)
