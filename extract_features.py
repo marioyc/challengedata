@@ -119,7 +119,7 @@ def feature2(X):
 
     return ret
 
-def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
+def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     print "method of feature extraction: feature3"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
@@ -127,18 +127,27 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
     n = len(X)
     ret = numpy.zeros((n,2 * dim + 3))
 
-    stop = set(nltk.corpus.stopwords.words('french'))
+    stop = nltk.corpus.stopwords.words('french')
+    stop = set(stop)
+
+    if debug:
+        f = open('feature3.log', 'w')
+        f.write('stopwords: ' + str(nltk.corpus.stopwords.words('french')) + '\n')
 
     for i in range(n):
+        if debug:
+            f.write('id: ' + X[i]['id'] + '\n')
         ### review content
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
+        tokens_model = []
 
         embedding = numpy.zeros(dim)
         sum_weights = 0
         for token in tokens:
             if token in model:
+                tokens_model.append(token)
                 if use_idf:
                     if token in word2idf:
                         embedding += word2idf[token] * model[token]
@@ -154,6 +163,11 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
             pass
         else:
             embedding /= sum_weights
+
+        if debug:
+            f.write('(content) tokens: ' + str(tokens) + '\n')
+            f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(content) sum weights: ' + str(sum_weights) + '\n')
 
         ret[i, 0:dim] = embedding
         ret[i,dim] = sum_weights
@@ -162,11 +176,13 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
+        tokens_model = []
 
         embedding = numpy.zeros(dim)
         sum_weights = 0
         for token in tokens:
             if token in model:
+                tokens_model.append(token)
                 if use_idf:
                     if token in word2idf:
                         embedding += word2idf[token] * model[token]
@@ -183,10 +199,17 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None):
         else:
             embedding /= sum_weights
 
+        if debug:
+            f.write('(title) tokens: ' + str(tokens) + '\n')
+            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
+
         ret[i, dim + 1:2 * dim + 1] = embedding
         ret[i,2 * dim + 1] = sum_weights
 
         ret[i, 2 * dim + 2] = X[i]['stars']
+        if debug:
+            f.write('stars: ' + str(X[i]['stars']) + '\n')
 
     return ret
 
@@ -239,15 +262,17 @@ def main():
 
     ##### Processing
     word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
-    use_idf = True
+    emb_dim = 200
+    use_idf = False
+    debug = True
 
     if use_idf:
         word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
-        Xtrain = feature3(Xtrain, word2vec_model, 200, True, word2idf)
-        Xtest = feature3(Xtest, word2vec_model, 200, True, word2idf)
+        Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
+        Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
     else:
-        Xtrain = feature3(Xtrain, word2vec_model, 200)
-        Xtest = feature3(Xtest, word2vec_model, 200)
+        Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug)
+        Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug)
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
