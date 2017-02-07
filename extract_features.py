@@ -1,11 +1,13 @@
+import argparse
 import nltk
 import numpy
+import os
 import pickle
+import string
 import word2vec
+
 from load_data import load_data
 from lib import method1
-import os
-import argparse
 
 def parseArguments():
     parser = argparse.ArgumentParser(description="Train and test prediction of review interest")
@@ -119,6 +121,18 @@ def feature2(X):
 
     return ret
 
+def fix_token(model, token):
+    if token in model:
+        return token
+    prefixes = ["l'", "s'", "d'"]
+    if token[:2] in prefixes:
+        token = token[2:]
+        if token in model:
+            return token
+        else:
+            return None
+    return None
+
 def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     print "method of feature extraction: feature3"
     print "model filename: %s" % model_filename
@@ -128,6 +142,8 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     ret = numpy.zeros((n,2 * dim + 3))
 
     stop = nltk.corpus.stopwords.words('french')
+    stop += list(string.punctuation)
+    stop += ["''", "``"]
     stop = set(stop)
 
     if debug:
@@ -141,12 +157,17 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
+
+        if debug:
+            f.write('(content) tokens: ' + str(tokens) + '\n')
+
+        tokens = [fix_token(model, w) for w in tokens]
         tokens_model = []
 
         embedding = numpy.zeros(dim)
         sum_weights = 0
         for token in tokens:
-            if token in model:
+            if token is not None:
                 tokens_model.append(token)
                 if use_idf:
                     if token in word2idf:
@@ -165,7 +186,6 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
             embedding /= sum_weights
 
         if debug:
-            f.write('(content) tokens: ' + str(tokens) + '\n')
             f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
             f.write('(content) sum weights: ' + str(sum_weights) + '\n')
 
@@ -176,12 +196,17 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
+
+        if debug:
+            f.write('(title) tokens: ' + str(tokens) + '\n')
+
+        tokens = [fix_token(model, w) for w in tokens]
         tokens_model = []
 
         embedding = numpy.zeros(dim)
         sum_weights = 0
         for token in tokens:
-            if token in model:
+            if token is not None:
                 tokens_model.append(token)
                 if use_idf:
                     if token in word2idf:
@@ -200,7 +225,6 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
             embedding /= sum_weights
 
         if debug:
-            f.write('(title) tokens: ' + str(tokens) + '\n')
             f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
             f.write('(title) sum weights: ' + str(sum_weights) + '\n')
 
