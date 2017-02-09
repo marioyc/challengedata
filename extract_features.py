@@ -1,11 +1,13 @@
+import argparse
 import nltk
 import numpy
+import os
 import pickle
+import string
 import word2vec
+
 from load_data import load_data
 from lib import method1
-import os
-import argparse
 
 def parseArguments():
     parser = argparse.ArgumentParser(description="Train and test prediction of review interest")
@@ -22,6 +24,46 @@ def parseArguments():
     args = parser.parse_args()
     return args
 
+def IDF(X):
+    print "Computing IDF"
+    n = len(X)
+    stop = set(nltk.corpus.stopwords.words('french'))
+    stop = nltk.corpus.stopwords.words('french')
+    stop += list(string.punctuation)
+    stop += ["''", "``"]
+    stop = set(stop)
+    df = {}
+
+    for i in range(n):
+        ### review content
+        tokens = nltk.word_tokenize(X[i]['content'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+        tokens = numpy.unique(tokens)
+
+        for token in tokens:
+            if token in df:
+                df[token] += 1
+            else:
+                df[token] = 1
+
+        ### review title
+        tokens = nltk.word_tokenize(X[i]['title'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+        tokens = numpy.unique(tokens)
+
+        for token in tokens:
+            if token in df:
+                df[token] += 1
+            else:
+                df[token] = 1
+
+    word2idf = {}
+    for k,v in df.iteritems():
+        word2idf[k] = numpy.log(float(n) / v)
+
+    return word2idf
 
 #### FEATURE EXTRACTION METHODS ####
 
@@ -83,7 +125,19 @@ def feature2(X):
 
     return ret
 
-def feature3(X, model_filename, dim):
+def fix_token(model, token):
+    if token in model:
+        return token
+    prefixes = ["l'", "s'", "d'"]
+    if token[:2] in prefixes:
+        token = token[2:]
+        if token in model:
+            return token
+        else:
+            return None
+    return None
+
+def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     print "method of feature extraction: feature3"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
@@ -91,50 +145,99 @@ def feature3(X, model_filename, dim):
     n = len(X)
     ret = numpy.zeros((n,2 * dim + 3))
 
-    stop = set(nltk.corpus.stopwords.words('french'))
+    stop = nltk.corpus.stopwords.words('french')
+    stop += list(string.punctuation)
+    stop += ["''", "``"]
+    stop = set(stop)
+
+    if debug:
+        f = open('feature3.log', 'w')
+        f.write('stopwords: ' + str(nltk.corpus.stopwords.words('french')) + '\n')
 
     for i in range(n):
+        if debug:
+            f.write('id: ' + str(X[i]['id']) + '\n')
         ### review content
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
 
+        if debug:
+            f.write('(content) tokens: ' + str(tokens) + '\n')
+
+        tokens = [fix_token(model, w) for w in tokens]
+        tokens_model = []
+
         embedding = numpy.zeros(dim)
-        cont = 0
+        sum_weights = 0
         for token in tokens:
-            if token in model:
-                embedding += model[token]
-                cont += 1
-        if cont == 0:
+            if token is not None:
+                tokens_model.append(token)
+                if use_idf:
+                    if token in word2idf:
+                        embedding += word2idf[token] * model[token]
+                        sum_weights += word2idf[token]
+                    else:
+                        #print token
+                        pass
+                else:
+                    embedding += model[token]
+                    sum_weights += 1
+        if sum_weights == 0:
             #print tokens
             pass
         else:
-            embedding /= cont
+            embedding /= sum_weights
+
+        if debug:
+            f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(content) sum weights: ' + str(sum_weights) + '\n')
 
         ret[i, 0:dim] = embedding
-        ret[i,dim] = cont
+        ret[i,dim] = sum_weights
 
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
         tokens = [w for w in tokens if not w in stop]
 
+        if debug:
+            f.write('(title) tokens: ' + str(tokens) + '\n')
+
+        tokens = [fix_token(model, w) for w in tokens]
+        tokens_model = []
+
         embedding = numpy.zeros(dim)
-        cont = 0
+        sum_weights = 0
         for token in tokens:
-            if token in model:
-                embedding += model[token]
-                cont += 1
-        if cont == 0:
+            if token is not None:
+                tokens_model.append(token)
+                if use_idf:
+                    if token in word2idf:
+                        embedding += word2idf[token] * model[token]
+                        sum_weights += word2idf[token]
+                    else:
+                        #print token
+                        pass
+                else:
+                    embedding += model[token]
+                    sum_weights += 1
+        if sum_weights == 0:
             #print tokens
             pass
         else:
-            embedding /= cont
+            embedding /= sum_weights
+
+        if debug:
+            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
 
         ret[i, dim + 1:2 * dim + 1] = embedding
-        ret[i,2 * dim + 1] = cont
+        ret[i,2 * dim + 1] = sum_weights
 
         ret[i, 2 * dim + 2] = X[i]['stars']
+        if debug:
+            f.write('stars: ' + str(X[i]['stars']) + '\n')
 
     return ret
 
@@ -185,12 +288,21 @@ def main():
 
     Xtrain, Xtest, Ytrain = load_data()
 
-
     ##### Processing
-    Xtrain = feature2(Xtrain)
-    Xtest = feature2(Xtest)
-    #Xtrain = feature3(Xtrain, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
-    #Xtest = feature3(Xtest, 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin', 200)
+
+    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
+    emb_dim = 200
+    use_idf = False
+    debug = True
+
+    if use_idf:
+        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+        Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
+        Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
+    else:
+        Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug)
+        Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug)
+
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
