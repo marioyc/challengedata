@@ -24,16 +24,37 @@ def parseArguments():
     args = parser.parse_args()
     return args
 
-def IDF(X):
+def fix_token(model, token):
+    while len(token) > 1 and token[0] == "'":
+        token = token[1:]
+    while len(token) > 1 and token[-1] == "'":
+        token = token[:-1]
+    if token in model:
+        return token
+    prefixes = ["l'", "s'", "d'"]
+    if token[:2] in prefixes:
+        token = token[2:]
+        if token in model:
+            return token
+        else:
+            return None
+    return None
+
+def IDF(X, model_filename):
     print "Computing IDF"
+    model = word2vec.load(model_filename)
     n = len(X)
-    stop = set(nltk.corpus.stopwords.words('french'))
+    stop = stop_words.get_stop_words('french')
+    stop += list(string.punctuation)
+    stop += ["''", "``"]
+    stop = set(stop)
     df = {}
 
     for i in range(n):
         ### review content
-        tokens = nltk.word_tokenize(X[i]['content'], language='french')
+        tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
+        tokens = [fix_token(model, w) for w in tokens]
         tokens = [w for w in tokens if not w in stop]
         tokens = numpy.unique(tokens)
 
@@ -46,6 +67,7 @@ def IDF(X):
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
+        tokens = [fix_token(model, w) for w in tokens]
         tokens = [w for w in tokens if not w in stop]
         tokens = numpy.unique(tokens)
 
@@ -121,18 +143,6 @@ def feature2(X):
 
     return ret
 
-def fix_token(model, token):
-    if token in model:
-        return token
-    prefixes = ["l'", "s'", "d'"]
-    if token[:2] in prefixes:
-        token = token[2:]
-        if token in model:
-            return token
-        else:
-            return None
-    return None
-
 def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     print "method of feature extraction: feature3"
     print "model filename: %s" % model_filename
@@ -156,12 +166,12 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         ### review content
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
-        tokens = [w for w in tokens if not w in stop]
 
         if debug:
             f.write('(content) tokens: ' + str(tokens) + '\n')
 
         tokens = [fix_token(model, w) for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
         tokens_model = []
 
         embedding = numpy.zeros(dim)
@@ -195,12 +205,12 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
-        tokens = [w for w in tokens if not w in stop]
 
         if debug:
             f.write('(title) tokens: ' + str(tokens) + '\n')
 
         tokens = [fix_token(model, w) for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
         tokens_model = []
 
         embedding = numpy.zeros(dim)
@@ -285,13 +295,13 @@ def main():
     Xtrain, Xtest, Ytrain = load_data()
 
     ##### Processing
-    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
-    emb_dim = 200
+    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_500_skip_cut100.bin'
+    emb_dim = 500
     use_idf = False
     debug = True
 
     if use_idf:
-        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
         Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
         Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
     else:
