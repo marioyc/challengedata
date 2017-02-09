@@ -23,13 +23,13 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
     eval_set = [(Xtrain_train, Ytrain_train), (Xtrain_test, Ytrain_test)]
 
     params = {
-        'n_estimators' : 1000,
-        'max_depth' : 8,
+        'n_estimators' : 2000,
+        'max_depth' : 11,
         'learning_rate' : 0.01,
         'gamma' : 1,
         'subsample' : 0.8,
         'colsample_bytree' : 0.8,
-        #'reg_lambda' : 3,
+        'reg_lambda' : 3,
     }
 
     print "-------- PARAMETERS --------"
@@ -56,12 +56,13 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
 
     print "-------- fitting on the whole train data"
 
+    params['n_estimators'] = 654
     model = xgb.XGBClassifier(**params)
     model.fit(Xtrain, Ytrain, eval_metric='auc')
 
     print "-------- predict probabilities"
 
-    prob = np.array(model.predict_proba(Xtest, ntree_limit=model.best_ntree_limit))
+    prob = np.array(model.predict_proba(Xtest))#, ntree_limit=model.best_ntree_limit))
     prob = prob[:,1]
     f = open(output_path, 'w')
     f.write('ID;TARGET\n')

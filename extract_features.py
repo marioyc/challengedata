@@ -28,6 +28,23 @@ def parseArguments():
     args = parser.parse_args()
     return args
 
+
+def fix_token(model, token):
+    while len(token) > 1 and token[0] == "'":
+        token = token[1:]
+    while len(token) > 1 and token[-1] == "'":
+        token = token[:-1]
+    if token in model:
+        return token
+    prefixes = ["l'", "s'", "d'"]
+    if token[:2] in prefixes:
+        token = token[2:]
+        if token in model:
+            return token
+        else:
+            return None
+    return None
+
 def TF(tokens,norm_scheme=None,K=None,stemming=False):
     # tokens are assumed to have been extracted from review content or title, or both (concatenated)
     # refer to https://fr.wikipedia.org/wiki/TF-IDF
@@ -82,7 +99,6 @@ def IDF(X,model=None,stemming=False,dim=None):
     # only retain the dim terms with the most document frequency
     print "Computing IDF"
     n = len(X)
-    stop = set(nltk.corpus.stopwords.words('french'))
     stop = nltk.corpus.stopwords.words('french')
     stop += list(string.punctuation)
     stop += ["''", "``"]
@@ -195,18 +211,6 @@ def feature2(X):
 
     return ret
 
-def fix_token(model, token):
-    if token in model:
-        return token
-    prefixes = ["l'", "s'", "d'"]
-    if token[:2] in prefixes:
-        token = token[2:]
-        if token in model:
-            return token
-        else:
-            return None
-    return None
-
 def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     print "method of feature extraction: feature3 (IDF weigthed word2vec word embeddings)"
     print "model filename: %s" % model_filename
@@ -230,12 +234,12 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         ### review content
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
-        tokens = [w for w in tokens if not w in stop]
 
         if debug:
             f.write('(content) tokens: ' + str(tokens) + '\n')
 
         tokens = [fix_token(model, w) for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
         tokens_model = []
 
         embedding = numpy.zeros(dim)
@@ -269,12 +273,12 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
         tokens = [w.lower() for w in tokens]
-        tokens = [w for w in tokens if not w in stop]
 
         if debug:
             f.write('(title) tokens: ' + str(tokens) + '\n')
 
         tokens = [fix_token(model, w) for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
         tokens_model = []
 
         embedding = numpy.zeros(dim)
@@ -574,7 +578,6 @@ def main():
     Xtrain, Xtest, Ytrain = load_data()
 
     ##### Processing
-
     word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
     emb_dim = 200
     use_tfidf = True
@@ -582,19 +585,19 @@ def main():
     debug = True
 
 #    pure tfidf
-    #Xtrain = feature5(Xtrain, word2vec_model, tf_scheme=tf_scheme, debug=debug)
-    #Xtest = feature5(Xtest, word2vec_model, tf_scheme=tf_scheme, debug=debug)
+    Xtrain = feature5(Xtrain, word2vec_model, tf_scheme=tf_scheme, debug=debug)
+    Xtest = feature5(Xtest, word2vec_model, tf_scheme=tf_scheme, debug=debug)
 
-    if use_tfidf:
-        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
-        Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
-        Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
-    else:
-        Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
-        Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
+    # if use_tfidf:
+    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+    #     Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+    #     Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+    # else:
+    #     Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
+    #     Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
 
     # if use_idf:
-    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
     #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
     #     Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
     # else:
