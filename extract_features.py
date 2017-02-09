@@ -40,11 +40,55 @@ def fix_token(model, token):
             return None
     return None
 
-def IDF(X, model_filename):
+def TF(tokens,norm_scheme=None,K=None):
+    # tokens are assumed to have been extracted from review content or title, or both (concatenated)
+    # refer to https://fr.wikipedia.org/wiki/TF-IDF
+    # print "Computing TF with scheme: %s" % norm_scheme if (not norm_scheme is None) else "raw frequency"
+    if len(tokens) == 0 or tokens is None:
+        return None
+
+    norm_schemes = ["binary","log","max.5","max"]
+    raw_freq = {}
+    unique_tokens = numpy.unique(tokens)
+
+    for unique_token in unique_tokens:
+        for token in tokens:
+            if unique_token in raw_freq:
+                raw_freq[unique_token] += 1
+            else:
+                raw_freq[unique_token] = 1
+
+    # now that we have the raw_freq, different normalization schemes can be used
+    if norm_scheme in norm_schemes:
+        ret = {}
+        if norm_scheme=="binary":
+            for key,value in raw_freq.iteritems():
+                ret[key] = 1
+            return ret
+        if norm_scheme=="log":
+            for key,value in raw_freq.iteritems():
+                ret[key] = 1 + numpy.log(value)
+            return ret
+        if norm_scheme=="max.5":
+            max_freq = float(max([value for value in raw_freq.values()]))
+            for key,value in raw_freq.iteritems():
+                ret[key] = 0.5 + numpy.log(float(value)/max_freq)
+            return ret
+        if norm_scheme=="max":
+            assert (K>=0 and K<=0), "in TF: max scheme was specified but no valid K was"
+            max_freq = float(max([value for value in raw_freq.values()]))
+            for key,value in raw_freq.iteritems():
+                ret[key] = K + (1-K)*numpy.log(float(value)/max_freq)
+            return ret
+    else:
+        # default is the raw frequency
+        return raw_freq
+
+def IDF(X):
     print "Computing IDF"
     model = word2vec.load(model_filename)
     n = len(X)
-    stop = stop_words.get_stop_words('french')
+    stop = nltk.corpus.stopwords.words('french')
     stop += list(string.punctuation)
     stop += ["''", "``"]
     stop = set(stop)
@@ -144,7 +188,7 @@ def feature2(X):
     return ret
 
 def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
-    print "method of feature extraction: feature3"
+    print "method of feature extraction: feature3 (IDF weigthed word2vec word embeddings)"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
 
@@ -162,7 +206,7 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
 
     for i in range(n):
         if debug:
-            f.write('id: ' + X[i]['id'] + '\n')
+            f.write('id: ' + str(X[i]['id']) + '\n')
         ### review content
         tokens = nltk.word_tokenize(X[i]['content'], language='french')
         tokens = [w.lower() for w in tokens]
@@ -247,6 +291,121 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
 
     return ret
 
+def feature4(X, model_filename, dim, use_tfidf=False, word2idf=None, debug=False):
+    print "method of feature extraction: feature4 (TF-IDF weigthed word2vec word embeddings)"
+    print "model filename: %s" % model_filename
+    model = word2vec.load(model_filename)
+
+    n = len(X)
+    ret = numpy.zeros((n,2 * dim + 3)) # 3 is for content_sum_weights, title_sum_weights, n_stars
+
+    stop = nltk.corpus.stopwords.words('french')
+    stop += list(string.punctuation)
+    stop += ["''", "``"]
+    stop = set(stop)
+
+    if debug:
+        f = open('feature4.log', 'w')
+        f.write('stopwords: ' + str(nltk.corpus.stopwords.words('french')) + '\n')
+
+    for i in range(n):
+        if debug:
+            f.write('id: ' + str(X[i]['id']) + '\n')
+        ### review content
+        tokens = nltk.word_tokenize(X[i]['content'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        if debug:
+            f.write('(content) tokens: ' + str(tokens) + '\n')
+
+        tokens = [fix_token(model, w) for w in tokens]
+        tokens_model = []
+
+        embedding = numpy.zeros(dim)
+        sum_weights = 0
+
+        word2tf = None
+        if use_tfidf:
+            word2tf = TF(tokens,"max.5")
+
+        for token in tokens:
+            if token is not None:
+                tokens_model.append(token)
+                if use_tfidf:
+                    if token in word2idf:
+                        embedding += word2idf[token] * word2tf[token] * model[token]
+                        sum_weights += word2idf[token] * word2tf[token]
+                    else:
+                        #print token
+                        pass
+                else:
+                    embedding += model[token]
+                    sum_weights += 1
+        if sum_weights == 0:
+            #print tokens
+            pass
+        else:
+            embedding /= sum_weights
+
+        if debug:
+            f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(content) sum weights: ' + str(sum_weights) + '\n')
+
+        ret[i, 0:dim] = embedding
+        ret[i,dim] = sum_weights
+
+        ### review title
+        tokens = nltk.word_tokenize(X[i]['title'], language='french')
+        tokens = [w.lower() for w in tokens]
+        tokens = [w for w in tokens if not w in stop]
+
+        if debug:
+            f.write('(title) tokens: ' + str(tokens) + '\n')
+
+        tokens = [fix_token(model, w) for w in tokens]
+        tokens_model = []
+
+        embedding = numpy.zeros(dim)
+        sum_weights = 0
+
+        word2tf = None
+        if use_tfidf:
+            word2tf = TF(tokens,"max.5")
+
+        for token in tokens:
+            if token is not None:
+                tokens_model.append(token)
+                if use_tfidf:
+                    if token in word2idf:
+                        embedding += word2idf[token] * word2tf[token] * model[token]
+                        sum_weights += word2idf[token] * word2tf[token]
+                    else:
+                        #print token
+                        pass
+                else:
+                    embedding += model[token]
+                    sum_weights += 1
+        if sum_weights == 0:
+            #print tokens
+            pass
+        else:
+            embedding /= sum_weights
+
+        if debug:
+            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
+
+        ret[i, dim + 1:2 * dim + 1] = embedding
+        ret[i,2 * dim + 1] = sum_weights
+
+        ret[i, 2 * dim + 2] = X[i]['stars']
+        if debug:
+            f.write('stars: ' + str(X[i]['stars']) + '\n')
+
+    return ret
+
+
 def process_input(X):
     embedding_data = pickle.load(open('data/polyglot-fr.pkl', 'rb'))
     word_embedding = {}
@@ -297,16 +456,25 @@ def main():
     ##### Processing
     word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_500_skip_cut100.bin'
     emb_dim = 500
-    use_idf = False
+    use_tfidf = True
     debug = True
 
-    if use_idf:
-        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
-        Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
-        Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
+    if use_tfidf:
+        word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+        Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+        Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
     else:
-        Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug)
-        Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug)
+        Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
+        Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
+
+    # if use_idf:
+    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
+    #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
+    #     Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
+    # else:
+    #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug)
+    #     Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug)
+
     #####
 
     numpy.save(os.path.join(output_folder,output_prefix + '_train.npy'),Xtrain)
