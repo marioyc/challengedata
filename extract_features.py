@@ -84,7 +84,7 @@ def TF(tokens,norm_scheme=None,K=None):
         # default is the raw frequency
         return raw_freq
 
-def IDF(X):
+def IDF(X, model_filename):
     print "Computing IDF"
     model = word2vec.load(model_filename)
     n = len(X)
@@ -187,7 +187,7 @@ def feature2(X):
 
     return ret
 
-def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
+def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False, log_filename='feature3'):
     print "method of feature extraction: feature3 (IDF weigthed word2vec word embeddings)"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
@@ -198,11 +198,12 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
     stop = nltk.corpus.stopwords.words('french')
     stop += list(string.punctuation)
     stop += ["''", "``"]
-    stop = set(stop)
 
     if debug:
-        f = open('feature3.log', 'w')
-        f.write('stopwords: ' + str(nltk.corpus.stopwords.words('french')) + '\n')
+        f = open(log_filename + '.log', 'w')
+        f.write('stopwords: ' + str(stop) + '\n')
+
+    stop = set(stop)
 
     for i in range(n):
         if debug:
@@ -467,13 +468,13 @@ def main():
         Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
         Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
 
-    # if use_idf:
-    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
-    #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
-    #     Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
-    # else:
-    #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug)
-    #     Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug)
+    #if use_tfidf:
+    #    word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
+    #    Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_train')
+    #    Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_test')
+    #else:
+    #    Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug, log_filename='feature3_train')
+    #    Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug, log_filename='feature3_test')
 
     #####
 
