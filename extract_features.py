@@ -579,31 +579,35 @@ def main():
     Xtrain, Xtest, Ytrain = load_data()
 
     ##### Processing
-    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
-    emb_dim = 200
-    use_tfidf = True
+    feature_extraction_method = 3
+    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_500_skip_cut100.bin'
+    emb_dim = 500
+    use_tfidf = False
     tf_scheme="max.5"
     debug = True
 
-#    pure tfidf
-    Xtrain = feature5(Xtrain, word2vec_model, tf_scheme=tf_scheme, debug=debug)
-    Xtest = feature5(Xtest, word2vec_model, tf_scheme=tf_scheme, debug=debug)
-
-    # if use_tfidf:
-    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
-    #     Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
-    #     Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
-    # else:
-    #     Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
-    #     Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
-
-    #if use_tfidf:
-    #    word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
-    #    Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_train')
-    #    Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_test')
-    #else:
-    #    Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug, log_filename='feature3_train')
-    #    Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug, log_filename='feature3_test')
+    if feature_extraction_method == 3:
+        if use_tfidf:
+            word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
+            Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_train')
+            Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_test')
+        else:
+            Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug, log_filename='feature3_train')
+            Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug, log_filename='feature3_test')
+    elif feature_extraction_method == 4:
+        if use_tfidf:
+            word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+            Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+            Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+        else:
+            Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
+            Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
+    elif feature_extraction_method == 5:
+        #pure tfidf
+        Xtrain = feature5(Xtrain, word2vec_model, tf_scheme=tf_scheme, debug=debug)
+        Xtest = feature5(Xtest, word2vec_model, tf_scheme=tf_scheme, debug=debug)
+    else:
+        raise Exception("Invalid feature extraction method")
 
     #####
 
