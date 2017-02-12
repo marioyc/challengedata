@@ -211,13 +211,11 @@ def feature2(X):
 
     return ret
 
-def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False, log_filename='feature3'):
+def feature3(X, model_filename, dim, mix_content_title=True, use_idf=False, word2idf=None, debug=False, log_filename='feature3'):
     print "method of feature extraction: feature3 (IDF weigthed word2vec word embeddings)"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
-
     n = len(X)
-    ret = numpy.zeros((n,2 * dim + 3))
 
     stop = nltk.corpus.stopwords.words('french')
     stop += list(string.punctuation)
@@ -228,6 +226,11 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False, 
         f.write('stopwords: ' + str(stop) + '\n')
 
     stop = set(stop)
+
+    if mix_content_title:
+        ret = numpy.zeros((n, dim + 2))
+    else:
+        ret = numpy.zeros((n, 2 * dim + 3))
 
     for i in range(n):
         if debug:
@@ -258,18 +261,19 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False, 
                 else:
                     embedding += model[token]
                     sum_weights += 1
-        if sum_weights == 0:
-            #print tokens
-            pass
-        else:
-            embedding /= sum_weights
 
         if debug:
             f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
             f.write('(content) sum weights: ' + str(sum_weights) + '\n')
 
-        ret[i, 0:dim] = embedding
-        ret[i,dim] = sum_weights
+        if not mix_content_title:
+            if sum_weights == 0:
+                #print tokens
+                pass
+            else:
+                embedding /= sum_weights
+            ret[i, 0:dim] = embedding
+            ret[i,dim] = sum_weights
 
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
@@ -282,8 +286,10 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False, 
         tokens = [w for w in tokens if not w in stop]
         tokens_model = []
 
-        embedding = numpy.zeros(dim)
-        sum_weights = 0
+        if not mix_content_title:
+            embedding = numpy.zeros(dim)
+            sum_weights = 0
+
         for token in tokens:
             if token is not None:
                 tokens_model.append(token)
@@ -297,20 +303,26 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False, 
                 else:
                     embedding += model[token]
                     sum_weights += 1
+
+        if debug:
+            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
+
         if sum_weights == 0:
             #print tokens
             pass
         else:
             embedding /= sum_weights
 
-        if debug:
-            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
-            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
+        if not mix_content_title:
+            ret[i, dim + 1:2 * dim + 1] = embedding
+            ret[i, 2 * dim + 1] = sum_weights
+            ret[i, 2 * dim + 2] = X[i]['stars']
+        else:
+            ret[i, 0:dim] = embedding
+            ret[i, dim] = sum_weights
+            ret[i, dim + 1] = X[i]['stars']
 
-        ret[i, dim + 1:2 * dim + 1] = embedding
-        ret[i,2 * dim + 1] = sum_weights
-
-        ret[i, 2 * dim + 2] = X[i]['stars']
         if debug:
             f.write('stars: ' + str(X[i]['stars']) + '\n')
 
