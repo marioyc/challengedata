@@ -211,22 +211,26 @@ def feature2(X):
 
     return ret
 
-def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
+def feature3(X, model_filename, dim, mix_content_title=True, use_idf=False, word2idf=None, debug=False, log_filename='feature3'):
     print "method of feature extraction: feature3 (IDF weigthed word2vec word embeddings)"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
-
     n = len(X)
-    ret = numpy.zeros((n,2 * dim + 3))
 
     stop = nltk.corpus.stopwords.words('french')
     stop += list(string.punctuation)
     stop += ["''", "``"]
-    stop = set(stop)
 
     if debug:
-        f = open('feature3.log', 'w')
-        f.write('stopwords: ' + str(nltk.corpus.stopwords.words('french')) + '\n')
+        f = open(log_filename + '.log', 'w')
+        f.write('stopwords: ' + str(stop) + '\n')
+
+    stop = set(stop)
+
+    if mix_content_title:
+        ret = numpy.zeros((n, dim + 2))
+    else:
+        ret = numpy.zeros((n, 2 * dim + 3))
 
     for i in range(n):
         if debug:
@@ -257,18 +261,19 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
                 else:
                     embedding += model[token]
                     sum_weights += 1
-        if sum_weights == 0:
-            #print tokens
-            pass
-        else:
-            embedding /= sum_weights
 
         if debug:
             f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
             f.write('(content) sum weights: ' + str(sum_weights) + '\n')
 
-        ret[i, 0:dim] = embedding
-        ret[i,dim] = sum_weights
+        if not mix_content_title:
+            if sum_weights == 0:
+                #print tokens
+                pass
+            else:
+                embedding /= sum_weights
+            ret[i, 0:dim] = embedding
+            ret[i,dim] = sum_weights
 
         ### review title
         tokens = nltk.word_tokenize(X[i]['title'], language='french')
@@ -281,8 +286,10 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
         tokens = [w for w in tokens if not w in stop]
         tokens_model = []
 
-        embedding = numpy.zeros(dim)
-        sum_weights = 0
+        if not mix_content_title:
+            embedding = numpy.zeros(dim)
+            sum_weights = 0
+
         for token in tokens:
             if token is not None:
                 tokens_model.append(token)
@@ -296,20 +303,26 @@ def feature3(X, model_filename, dim, use_idf=False, word2idf=None, debug=False):
                 else:
                     embedding += model[token]
                     sum_weights += 1
+
+        if debug:
+            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
+            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
+
         if sum_weights == 0:
             #print tokens
             pass
         else:
             embedding /= sum_weights
 
-        if debug:
-            f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
-            f.write('(title) sum weights: ' + str(sum_weights) + '\n')
+        if not mix_content_title:
+            ret[i, dim + 1:2 * dim + 1] = embedding
+            ret[i, 2 * dim + 1] = sum_weights
+            ret[i, 2 * dim + 2] = X[i]['stars']
+        else:
+            ret[i, 0:dim] = embedding
+            ret[i, dim] = sum_weights
+            ret[i, dim + 1] = X[i]['stars']
 
-        ret[i, dim + 1:2 * dim + 1] = embedding
-        ret[i,2 * dim + 1] = sum_weights
-
-        ret[i, 2 * dim + 2] = X[i]['stars']
         if debug:
             f.write('stars: ' + str(X[i]['stars']) + '\n')
 
@@ -578,31 +591,35 @@ def main():
     Xtrain, Xtest, Ytrain = load_data()
 
     ##### Processing
-    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_200_skip_cut100.bin'
-    emb_dim = 200
-    use_tfidf = True
+    feature_extraction_method = 3
+    word2vec_model = 'data/frWac_non_lem_no_postag_no_phrase_500_skip_cut100.bin'
+    emb_dim = 500
+    use_tfidf = False
     tf_scheme="max.5"
     debug = True
 
-#    pure tfidf
-    Xtrain = feature5(Xtrain, word2vec_model, tf_scheme=tf_scheme, debug=debug)
-    Xtest = feature5(Xtest, word2vec_model, tf_scheme=tf_scheme, debug=debug)
-
-    # if use_tfidf:
-    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
-    #     Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
-    #     Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
-    # else:
-    #     Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
-    #     Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
-
-    # if use_idf:
-    #     word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
-    #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
-    #     Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug)
-    # else:
-    #     Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug)
-    #     Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug)
+    if feature_extraction_method == 3:
+        if use_tfidf:
+            word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0), word2vec_model)
+            Xtrain = feature3(Xtrain, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_train')
+            Xtest = feature3(Xtest, word2vec_model, emb_dim, use_idf=True, word2idf=word2idf, debug=debug, log_filename='feature3_test')
+        else:
+            Xtrain = feature3(Xtrain, word2vec_model, emb_dim, debug=debug, log_filename='feature3_train')
+            Xtest = feature3(Xtest, word2vec_model, emb_dim, debug=debug, log_filename='feature3_test')
+    elif feature_extraction_method == 4:
+        if use_tfidf:
+            word2idf = IDF(numpy.concatenate((Xtrain, Xtest), axis=0))
+            Xtrain = feature4(Xtrain, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+            Xtest = feature4(Xtest, word2vec_model, emb_dim, use_tfidf=True, word2idf=word2idf, debug=debug)
+        else:
+            Xtrain = feature4(Xtrain, word2vec_model, emb_dim, debug=debug)
+            Xtest = feature4(Xtest, word2vec_model, emb_dim, debug=debug)
+    elif feature_extraction_method == 5:
+        #pure tfidf
+        Xtrain = feature5(Xtrain, word2vec_model, tf_scheme=tf_scheme, debug=debug)
+        Xtest = feature5(Xtest, word2vec_model, tf_scheme=tf_scheme, debug=debug)
+    else:
+        raise Exception("Invalid feature extraction method")
 
     #####
 
