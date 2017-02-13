@@ -45,11 +45,19 @@ def load_input_file(filename, ninput, firstID):
 def load_output_file(filename):
     f = open(filename, 'rU')
     reader = csv.reader(f, delimiter=';')
-    Y = []
-
     reader.next()
+
+    Y = []
+    useful, not_useful = 0, 0
     for row in reader:
         Y.append(int(row[1]))
+        if Y[-1] == 1:
+            useful += 1
+        else:
+            not_useful += 1
+
+    print "Useful reviews: %d" % useful
+    print "Not useful reviews: %d" % not_useful
 
     return Y
 
