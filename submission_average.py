@@ -19,6 +19,7 @@ for filename in submissions_filename:
     prob_list.append(p)
 
 f = open(output_path, 'w')
+f.write('ID;TARGET\n')
 
 pos = 80001
 n_prob = len(prob_list[0])
