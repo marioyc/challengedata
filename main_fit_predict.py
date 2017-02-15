@@ -1,10 +1,10 @@
+import argparse
 import nltk
 import numpy
 import pickle
-from load_data import load_data
-from lib import method1
 
-import argparse
+from lib_fit import *
+from load_data import load_data
 
 def parseArguments():
     parser = argparse.ArgumentParser(description="Train and test prediction of review interest")

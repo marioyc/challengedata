@@ -56,7 +56,7 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
 
     print "-------- fitting on the whole train data"
 
-    params['n_estimators'] = 654
+    params['n_estimators'] = len(evals_result['validation_0']['auc'])#654
     model = xgb.XGBClassifier(**params)
     model.fit(Xtrain, Ytrain, eval_metric='auc')
 
