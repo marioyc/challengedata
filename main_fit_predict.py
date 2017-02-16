@@ -35,12 +35,15 @@ def main():
     Ytrain = numpy.load(args.Ytrain)
     cross_validate = args.X
 
+    print "Dimensions of embedding: %d" % Xtrain.shape[1]
+
     if cross_validate is None:
         cross_validate = 70
 
     assert (cross_validate > 0 and cross_validate < 100), "Error in cross-validation splitting percentage"
 
-    method1.predict(Xtrain,Ytrain,Xtest,cross_validate,output_path)
+    #method3.optimize(Xtrain, Ytrain, cross_validate)
+    method3.predict(Xtrain, Ytrain, Xtest, cross_validate, output_path)
 
 
 if __name__ == '__main__':
