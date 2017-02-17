@@ -1,10 +1,22 @@
+from keras.callbacks import Callback
 from keras.preprocessing import sequence
 from keras.models import Sequential
 from keras.layers import Dense, Dropout, Activation, Embedding, LSTM, SimpleRNN, GRU
 from keras.layers import Convolution1D
 from keras.optimizers import Adam
+from sklearn.metrics import roc_auc_score
 
 import matplotlib.pyplot as plt
+
+class AUCCallback(Callback):
+    def __init__(self):
+        super(Callback, self).__init__()
+
+    def on_epoch_end(self, epoch, logs={}):
+        y_pred = self.model.predict_proba(self.model.validation_data[0], verbose=0)
+        auc = roc_auc_score(self.model.validation_data[1], y_pred)
+        print "AUC: {:.6f}".format(auc)
+
 
 def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, X_percentage, output_path):
     split_idx = int((float(X_percentage) / float(100)) * len(Xtrain))
@@ -35,11 +47,11 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, X_percentage, output_path)
                         input_length=maxlen,
                         dropout=0.3))
     model.layers[0].trianable = False
-    model.add(Convolution1D(nb_filter=nb_filter,
-                            filter_length=filter_length,
-                            border_mode='valid',
-                            activation='relu',
-                            subsample_length=1))
+    #model.add(Convolution1D(nb_filter=nb_filter,
+    #                        filter_length=filter_length,
+    #                        border_mode='valid',
+    #                        activation='relu',
+    #                        subsample_length=1))
     model.add(LSTM(nhid, dropout_W=0.2, dropout_U=0.2))
 
     model.add(Dense(hidden_dims))
@@ -53,7 +65,8 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, X_percentage, output_path)
     print "-------- starting training of the model"
     batch_size       =  64
     nb_epoch         =  7
-    history = model.fit(Xtrain, Ytrain, batch_size=batch_size, nb_epoch=nb_epoch, validation_split=0.3)
+    auc_callback = AUCCallback()
+    history = model.fit(Xtrain, Ytrain, batch_size=batch_size, nb_epoch=nb_epoch, validation_split=0.3, callbacks=[auc_callback])
 
     plt.figure(1)
     plt.subplot(1,2,1)
