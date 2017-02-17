@@ -1,9 +1,64 @@
+from sklearn.model_selection import train_test_split
+from hyperopt import fmin, tpe, hp, Trials
+import matplotlib.pyplot as plt
 import numpy as np
 import xgboost as xgb
 
-import matplotlib.pyplot as plt
+from utils import output_distribution
 
-def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
+def score(params):
+    global ntrials
+    ntrials += 1
+    print "(Trial %d)\n" % ntrials
+    print "Training with params :"
+    print params
+
+    params['max_depth'] = int(params['max_depth'])
+    params['n_estimators'] = 3000
+    early_stopping_rounds = 10
+
+    eval_set = [(X_train, y_train), (X_test, y_test)]
+    model = xgb.XGBClassifier(**params)
+    model.fit(X_train, y_train, eval_set=eval_set, eval_metric='auc',
+        early_stopping_rounds=early_stopping_rounds, verbose=False)
+
+    evals_result = model.evals_result()
+    rounds = len(evals_result['validation_1']['auc']) - early_stopping_rounds
+    auc = evals_result['validation_1']['auc'][-early_stopping_rounds - 1]
+    print "rounds: %d, AUC: %.5f" % (rounds, auc)
+    print "-" * 20
+    return -auc
+
+
+def optimize(X, y, train_percentage):
+    global X_train, X_test, y_train, y_test, ntrials
+    split_idx = int((float(train_percentage) / float(100)) * len(X))
+
+    X_train = X[:split_idx,:]
+    X_test = X[split_idx:,:]
+
+    y_train = y[:split_idx]
+    y_test = y[split_idx:]
+
+    output_distribution(y_train)
+    output_distribution(y_test)
+
+    space = {
+        'max_depth' : hp.quniform('max_depth', 7, 12, 1),
+        'learning_rate' : hp.quniform('learning_rate', 0.005, 0.5, 0.005),
+        'min_child_weight' : hp.quniform('min_child_weight', 1, 6, 1),
+        'gamma' : hp.quniform('gamma', 0.5, 1, 0.05),
+        'subsample' : hp.quniform('subsample', 0.5, 1, 0.05),
+        'colsample_bytree' : hp.quniform('colsample_bytree', 0.5, 1, 0.05),
+        'reg_lambda' : hp.quniform('reg_lambda', 1, 10, 0.5),
+    }
+
+    trials = Trials()
+    ntrials = 0
+    best = fmin(score, space, algo=tpe.suggest, trials=trials, max_evals=250)
+    print best
+
+def predict(Xtrain, Ytrain, Xtest, X_percentage, output_path):
     split_idx = int((float(X_percentage) / float(100)) * len(Xtrain))
 
     print "--- DATABASE COMPOSITION ---"
@@ -18,8 +73,9 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
     Ytrain_train = Ytrain[:split_idx]
     Ytrain_test = Ytrain[split_idx:]
 
-    dtrain = xgb.DMatrix(Xtrain_train, label=Ytrain_train)
-    dval = xgb.DMatrix(Xtrain_test, label=Ytrain_test)
+    output_distribution(Ytrain_train)
+    output_distribution(Ytrain_test)
+
     eval_set = [(Xtrain_train, Ytrain_train), (Xtrain_test, Ytrain_test)]
 
     params = {
@@ -31,6 +87,7 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
         'colsample_bytree' : 0.8,
         'reg_lambda' : 3,
     }
+    early_stopping_rounds = 10
 
     print "-------- PARAMETERS --------"
     for k,v in params.iteritems():
@@ -41,7 +98,8 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
 
     print "-------- fitting on the train_train data"
 
-    model.fit(Xtrain_train, Ytrain_train, eval_set=eval_set, eval_metric='auc', early_stopping_rounds=10)
+    model.fit(Xtrain_train, Ytrain_train, eval_set=eval_set, eval_metric='auc',
+        early_stopping_rounds=early_stopping_rounds)
     evals_result = model.evals_result()
 
     rounds = len(evals_result['validation_0']['auc'])
@@ -56,9 +114,9 @@ def predict(Xtrain,Ytrain,Xtest,X_percentage,output_path):
 
     print "-------- fitting on the whole train data"
 
-    params['n_estimators'] = len(evals_result['validation_0']['auc'])#654
+    params['n_estimators'] = rounds - early_stopping_rounds#654
     model = xgb.XGBClassifier(**params)
-    model.fit(Xtrain, Ytrain, eval_metric='auc')
+    model.fit(Xtrain, Ytrain)
 
     print "-------- predict probabilities"
 

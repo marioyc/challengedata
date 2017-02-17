@@ -1,10 +1,7 @@
 import argparse
-import nltk
 import numpy
-import pickle
 
 from lib_fit import *
-from load_data import load_data
 
 def parseArguments():
     parser = argparse.ArgumentParser(description="Train and test prediction of review interest")
@@ -44,7 +41,6 @@ def main():
 
     #method3.optimize(Xtrain, Ytrain, cross_validate)
     method3.predict(Xtrain, Ytrain, Xtest, cross_validate, output_path)
-
 
 if __name__ == '__main__':
     main()

@@ -5,7 +5,7 @@ import word2vec
 
 from utils import get_stop_words, fix_token
 
-def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=False, word2idf=None, debug=False, log_filename='feature3'):
+def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=False, word2idf=None, debug=False, log_filename='feature2'):
     print "method of feature extraction #2 (IDF weigthed word2vec word embeddings)"
     print "model filename: %s" % model_filename
     model = word2vec.load(model_filename)
@@ -37,6 +37,8 @@ def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=Fal
 
         embedding = numpy.zeros(dim)
         sum_weights = 0
+        not_in_model = 0
+        total_tokens = len(tokens)
         for token in tokens:
             if token is not None:
                 tokens_model.append(token)
@@ -50,6 +52,8 @@ def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=Fal
                 else:
                     embedding += model[token]
                     sum_weights += 1
+            else:
+                not_in_model += 1
 
         if debug:
             f.write('(content) tokens in model: ' + str(tokens_model) + '\n')
@@ -62,7 +66,8 @@ def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=Fal
             else:
                 embedding /= sum_weights
             ret[i, 0:dim] = embedding
-            ret[i,dim] = sum_weights
+            ret[i, dim] = sum_weights
+            #ret[i, dim + 1] = not_in_model / float(total_tokens)
 
         ### review title
         tokens = word_tokenize(X[i]['title'], language='french')
@@ -78,6 +83,10 @@ def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=Fal
         if not mix_content_title:
             embedding = numpy.zeros(dim)
             sum_weights = 0
+            not_in_model = 0
+            total_tokens = len(tokens)
+        else:
+            total_tokens += len(tokens)
 
         for token in tokens:
             if token is not None:
@@ -92,6 +101,8 @@ def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=Fal
                 else:
                     embedding += model[token]
                     sum_weights += 1
+            else:
+                not_in_model += 1
 
         if debug:
             f.write('(title) tokens in model: ' + str(tokens_model) + '\n')
@@ -106,10 +117,12 @@ def extract_features(X, model_filename, dim, mix_content_title=True, use_idf=Fal
         if not mix_content_title:
             ret[i, dim + 1:2 * dim + 1] = embedding
             ret[i, 2 * dim + 1] = sum_weights
+            #ret[i, 2 * dim + 3] = not_in_model / float(total_tokens)
             ret[i, 2 * dim + 2] = X[i]['stars']
         else:
             ret[i, 0:dim] = embedding
             ret[i, dim] = sum_weights
+            #ret[i, dim + 1] = not_in_model / float(total_tokens)
             ret[i, dim + 1] = X[i]['stars']
 
         if debug:
