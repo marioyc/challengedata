@@ -25,7 +25,7 @@ def score(params):
     evals_result = model.evals_result()
     rounds = len(evals_result['validation_1']['auc']) - early_stopping_rounds
     auc = evals_result['validation_1']['auc'][-early_stopping_rounds - 1]
-    print "rounds: %d, AUC: %.5f" % (rounds, auc)
+    print "rounds: %d, AUC: %.6f" % (rounds, auc)
     print "-" * 20
     return -auc
 
@@ -58,26 +58,7 @@ def optimize(X, y, train_percentage):
     best = fmin(score, space, algo=tpe.suggest, trials=trials, max_evals=250)
     print best
 
-def predict(Xtrain, Ytrain, Xtest, X_percentage, output_path):
-    split_idx = int((float(X_percentage) / float(100)) * len(Xtrain))
-
-    print "--- DATABASE COMPOSITION ---"
-    print "train_train: %d entries" % split_idx
-    print "train_test:  %d entries" % (len(Xtrain) - split_idx)
-    print "test:        %d entries" % len(Xtest)
-    print "----------------------------"
-
-    Xtrain_train = Xtrain[:split_idx,:]
-    Xtrain_test = Xtrain[split_idx:,:]
-
-    Ytrain_train = Ytrain[:split_idx]
-    Ytrain_test = Ytrain[split_idx:]
-
-    output_distribution(Ytrain_train)
-    output_distribution(Ytrain_test)
-
-    eval_set = [(Xtrain_train, Ytrain_train), (Xtrain_test, Ytrain_test)]
-
+def predict(Xtrain, Ytrain, Xtest, output_path, cross_validation=False, X_percentage=None):
     params = {
         'n_estimators' : 2000,
         'max_depth' : 11,
@@ -86,35 +67,58 @@ def predict(Xtrain, Ytrain, Xtest, X_percentage, output_path):
         'subsample' : 0.8,
         'colsample_bytree' : 0.8,
         'reg_lambda' : 3,
+        #'min_child_weight': 4.0,
     }
-    early_stopping_rounds = 10
 
     print "-------- PARAMETERS --------"
     for k,v in params.iteritems():
         print "%s: %f" % (k, v)
     print "----------------------------"
 
-    model = xgb.XGBClassifier(**params)
+    if cross_validation:
+        split_idx = int((float(X_percentage) / float(100)) * len(Xtrain))
 
-    print "-------- fitting on the train_train data"
+        print "--- DATABASE COMPOSITION ---"
+        print "train_train: %d entries" % split_idx
+        print "train_test:  %d entries" % (len(Xtrain) - split_idx)
+        print "test:        %d entries" % len(Xtest)
+        print "----------------------------"
 
-    model.fit(Xtrain_train, Ytrain_train, eval_set=eval_set, eval_metric='auc',
-        early_stopping_rounds=early_stopping_rounds)
-    evals_result = model.evals_result()
+        Xtrain_train = Xtrain[:split_idx,:]
+        Xtrain_test = Xtrain[split_idx:,:]
 
-    rounds = len(evals_result['validation_0']['auc'])
-    plt.figure(1)
-    plt.plot(range(0, rounds), evals_result['validation_0']['auc'], 'b', range(0, rounds), evals_result['validation_1']['auc'], 'r')
-    plt.ylabel('auc')
-    plt.xlabel('round')
-    plt.legend(['train', 'validation'], loc='upper left')
+        Ytrain_train = Ytrain[:split_idx]
+        Ytrain_test = Ytrain[split_idx:]
 
-    #xgb.plot_importance(model)
-    plt.show()
+        output_distribution(Ytrain_train)
+        output_distribution(Ytrain_test)
+
+        eval_set = [(Xtrain_train, Ytrain_train), (Xtrain_test, Ytrain_test)]
+
+        early_stopping_rounds = 10
+
+        model = xgb.XGBClassifier(**params)
+
+        print "-------- fitting on the train_train data"
+
+        model.fit(Xtrain_train, Ytrain_train, eval_set=eval_set, eval_metric='auc',
+            early_stopping_rounds=early_stopping_rounds)
+
+        evals_result = model.evals_result()
+        rounds = len(evals_result['validation_0']['auc'])
+        params['n_estimators'] = rounds - early_stopping_rounds
+
+        plt.figure(1)
+        plt.plot(range(0, rounds), evals_result['validation_0']['auc'], 'b', range(0, rounds), evals_result['validation_1']['auc'], 'r')
+        plt.ylabel('auc')
+        plt.xlabel('round')
+        plt.legend(['train', 'validation'], loc='upper left')
+
+        #xgb.plot_importance(model)
+        #plt.show()
 
     print "-------- fitting on the whole train data"
 
-    params['n_estimators'] = rounds - early_stopping_rounds#654
     model = xgb.XGBClassifier(**params)
     model.fit(Xtrain, Ytrain)
 

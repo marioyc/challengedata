@@ -40,7 +40,7 @@ def main():
     assert (cross_validate > 0 and cross_validate < 100), "Error in cross-validation splitting percentage"
 
     #method3.optimize(Xtrain, Ytrain, cross_validate)
-    method3.predict(Xtrain, Ytrain, Xtest, cross_validate, output_path)
+    method3.predict(Xtrain, Ytrain, Xtest, output_path, cross_validation=True, X_percentage=cross_validate)
 
 if __name__ == '__main__':
     main()
