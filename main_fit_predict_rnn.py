@@ -41,12 +41,7 @@ def main():
 
     assert (cross_validate > 0 and cross_validate < 100), "Error in cross-validation splitting percentage"
 
-    for i in range(len(Xtrain)):
-        Xtrain[i] = Xtrain[i]['content']
-    for i in range(len(Xtest)):
-        Xtest[i] = Xtest[i]['content']
-
-    method5.predict(Xtrain, Ytrain, Xtest, embeddings_matrix, cross_validate, output_path)
+    method5.predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_path, True)
 
 if __name__ == '__main__':
     main()

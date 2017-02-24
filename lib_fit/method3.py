@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import xgboost as xgb
 
-from utils import output_distribution
+from utils import output_distribution, output_result
 
 def score(params):
     global ntrials
@@ -126,11 +126,4 @@ def predict(Xtrain, Ytrain, Xtest, output_path, cross_validation=False, X_percen
 
     prob = np.array(model.predict_proba(Xtest))#, ntree_limit=model.best_ntree_limit))
     prob = prob[:,1]
-    f = open(output_path, 'w')
-    f.write('ID;TARGET\n')
-
-    pos = 80001
-    for p in prob:
-        f.write("{0};{1:.10f}\n".format(pos, p))
-        pos += 1
-    print "Ytest output to : %s" % output_path
+    output_result(prob, output_path)
