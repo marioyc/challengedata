@@ -14,8 +14,8 @@ def parseArguments():
     parser.add_argument("input_prefix",
         type=str, help='prefix of input files')
 
-    parser.add_argument("output_path",
-        type=str, help='output path for the prediction file')
+    parser.add_argument("output_prefix",
+        type=str, help='prefix for output and model files')
 
     parser.add_argument("-X",
         type=int, help='(optional) Indicate the X-validation split percentage (eg. 70) (defaults to 70)')
@@ -33,7 +33,7 @@ def main():
     #embeddings_index = pickle.load(open(os.path.join(input_path, 'embeddings_index.pkl'), 'rb'))
     embeddings_matrix = pickle.load(open(os.path.join(input_path, 'embeddings_matrix.pkl'), 'rb'))
     print embeddings_matrix.shape
-    output_path = args.output_path
+    output_prefix = args.output_prefix
     cross_validate = args.X
 
     if cross_validate is None:
@@ -41,7 +41,7 @@ def main():
 
     assert (cross_validate > 0 and cross_validate < 100), "Error in cross-validation splitting percentage"
 
-    method5.predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_path, True)
+    method5.predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, False)
 
 if __name__ == '__main__':
     main()
