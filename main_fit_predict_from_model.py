@@ -23,12 +23,10 @@ def parseArguments():
 def main():
     args = parseArguments()
     input_prefix = args.input_prefix
-    Xtrain = pickle.load(open(os.path.join('features/', input_prefix + '_train.pkl'), 'rb'))
+    #Xtrain = pickle.load(open(os.path.join('features/', input_prefix + '_train.pkl'), 'rb'))
+    Xtrain = numpy.load('features/' + input_prefix + '_train_features_1.npy')
     Ytrain = numpy.load(os.path.join('features/', 'Ytrain.npy'))
-    Xtest = pickle.load(open(os.path.join('features/', input_prefix + '_test.pkl'), 'rb'))
-    #embeddings_index = pickle.load(open(os.path.join('features/', 'embeddings_index.pkl'), 'rb'))
-    embeddings_matrix = pickle.load(open(os.path.join('features/', 'embeddings_matrix.pkl'), 'rb'))
-    print embeddings_matrix.shape
+    Xtest = numpy.load('features/' + input_prefix + '_test_features_1.npy')
     output_prefix = args.output_prefix
     cross_validate = args.X
 
@@ -37,7 +35,7 @@ def main():
 
     assert (cross_validate > 0 and cross_validate < 100), "Error in cross-validation splitting percentage"
 
-    method5.predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, False)
+    method6.predict(Xtrain, Ytrain, Xtest, output_prefix, True, X_percentage=cross_validate)
 
 if __name__ == '__main__':
     main()

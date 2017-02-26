@@ -1,3 +1,5 @@
+import numpy as np
+
 def output_distribution(y):
     useful, not_useful = 0, 0
     for c in y:
@@ -18,3 +20,15 @@ def output_result(prob, output_path):
         f.write("{0};{1:.10f}\n".format(pos, p))
         pos += 1
     print "Ytest output to : %s" % output_path
+
+def split_data(X):
+    content = []
+    title = []
+    stars = []
+
+    for x in X:
+        content.append(x['content'])
+        title.append(x['title'])
+        stars.append(x['stars'])
+
+    return content, title, np.array(stars)

@@ -9,9 +9,10 @@ from keras.optimizers import Adam, RMSprop, Adagrad, Adadelta, Nadam
 from sklearn.metrics import roc_auc_score
 
 import matplotlib.pyplot as plt
-import numpy as np
 
-from utils import output_result
+from utils import output_result, split_data
+
+import numpy
 
 class AUCCallback(Callback):
     def __init__(self):
@@ -25,21 +26,15 @@ class AUCCallback(Callback):
         auc = roc_auc_score(self.model.validation_data[3], y_pred)
         logs['val_auc'] = auc
 
-def load_data(X):
-    content = []
-    title = []
-    stars = []
-
-    for x in X:
-        content.append(x['content'])
-        title.append(x['title'])
-        stars.append(x['stars'])
-
-    return content, title, np.array(stars)
+def pop_layer(model):
+    model.layers.pop()
+    model.outputs = [model.layers[-1].output]
+    model.output_layers = [model.layers[-1]]
+    model.layers[-1].outbound_nodes = []
 
 def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_validation=False):
-    Xtrain_content, Xtrain_title, Xtrain_stars = load_data(Xtrain)
-    Xtest_content, Xtest_title, Xtest_stars = load_data(Xtest)
+    Xtrain_content, Xtrain_title, Xtrain_stars = split_data(Xtrain)
+    Xtest_content, Xtest_title, Xtest_stars = split_data(Xtest)
 
     print "--- DATABASE COMPOSITION ---"
     print "train:  %d entries" % len(Xtrain)
@@ -137,6 +132,26 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
     model.save_weights("models/" + output_prefix + ".h5")
 
     print "-------- predict probabilities"
-    prob = model.predict([Xtest_content, Xtest_title, Xtest_stars], verbose=0)
+    prob = model.predict([Xtest_content, Xtest_title, Xtest_stars], batch_size=128, verbose=0)
     prob = prob[:,0]
     output_result(prob, "results/" + output_prefix + ".csv")
+
+    print "-------- save intermediate features"
+    pop_layer(model)
+    pop_layer(model)
+    print model.layers
+    model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    train_features = model.predict([Xtrain_content, Xtrain_title, Xtrain_stars], batch_size=128, verbose=0)
+    test_features = model.predict([Xtest_content, Xtest_title, Xtest_stars], batch_size=128, verbose=0)
+    print train_features.shape, test_features.shape
+    numpy.save("features/" + output_prefix + "_train_features_1.npy", train_features)
+    numpy.save("features/" + output_prefix + "_test_features_1.npy", test_features)
+
+    pop_layer(model)
+    print model.layers
+    model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=['accuracy'])
+    train_features = model.predict([Xtrain_content, Xtrain_title, Xtrain_stars], batch_size=128, verbose=0)
+    test_features = model.predict([Xtest_content, Xtest_title, Xtest_stars], batch_size=128, verbose=0)
+    print train_features.shape, test_features.shape
+    numpy.save("features/" + output_prefix + "_train_features_2.npy", train_features)
+    numpy.save("features/" + output_prefix + "_test_features_2.npy", test_features)
