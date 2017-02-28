@@ -10,7 +10,7 @@ from sklearn.metrics import roc_auc_score
 
 import matplotlib.pyplot as plt
 
-from utils import output_result, split_data
+from utils import output_result, split_data, get_PR_coordinates
 
 import numpy
 
@@ -121,6 +121,13 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
         legend2 = axarr[2].legend(['validation'], loc='upper left')
 
         f.savefig("plots/" + output_prefix + ".png", bbox_extra_artists=(legend0, legend1, legend2), bbox_inches='tight')
+
+        split_idx = int(0.7 * len(Xtrain))
+        Xtrain_content = Xtrain_content[split_idx:]
+        Xtrain_title = Xtrain_title[split_idx:]
+        Xtrain_stars = Xtrain_stars[split_idx:]
+        Ytrain = Ytrain[split_idx:]
+        get_PR_coordinates(model.predict([Xtrain_content, Xtrain_title, Xtrain_stars], verbose=0), Ytrain, "plots/" + output_prefix + "_pr.txt")
     else:
         batch_size = 64
         nb_epoch = 18
