@@ -127,7 +127,9 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
         Xtrain_title = Xtrain_title[split_idx:]
         Xtrain_stars = Xtrain_stars[split_idx:]
         Ytrain = Ytrain[split_idx:]
-        get_PR_coordinates(model.predict([Xtrain_content, Xtrain_title, Xtrain_stars], verbose=0), Ytrain, "plots/" + output_prefix + "_pr.txt")
+        prob = model.predict([Xtrain_content, Xtrain_title, Xtrain_stars], verbose=0)
+        prob = prob[:,0]
+        get_PR_coordinates(prob, Ytrain, "plots/" + output_prefix + "_pr.txt")
     else:
         batch_size = 64
         nb_epoch = 18
