@@ -1,10 +1,11 @@
 from keras.callbacks import Callback
 from keras.preprocessing import sequence
 from keras.models import Model
-from keras.layers import Input, merge
+from keras.layers import Input
 from keras.layers import Dense, Dropout, Activation
-from keras.layers import Embedding
+from keras.layers import Embedding, SpatialDropout1D
 from keras.layers import Convolution1D, GlobalMaxPooling1D
+from keras.layers.merge import concatenate
 from keras.optimizers import Adam, RMSprop, Adagrad, Adadelta, Nadam
 from sklearn.metrics import roc_auc_score
 
@@ -22,8 +23,8 @@ class AUCCallback(Callback):
         self.params['metrics'] += ['val_auc']
 
     def on_epoch_end(self, epoch, logs=None):
-        y_pred = self.model.predict(self.model.validation_data[0:3], batch_size=128, verbose=0)
-        auc = roc_auc_score(self.model.validation_data[3], y_pred)
+        y_pred = self.model.predict(self.validation_data[0:3], batch_size=128, verbose=0)
+        auc = roc_auc_score(self.validation_data[3], y_pred)
         logs['val_auc'] = auc
 
 def pop_layer(model):
@@ -52,8 +53,7 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
     Xtest_title  = sequence.pad_sequences(Xtest_title, maxlen=maxlen_title)
 
     print "-------- building model"
-    nb_filter = 250
-    filter_length = 3
+    nb_filter = 150
     hidden_dims = 250
 
     content = Input(shape=(maxlen_content,))
@@ -62,31 +62,42 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
 
     embedding = Embedding(vocab_size,
                         embed_dim,
-                        weights=[embeddings_matrix],
-                        dropout=0.3)
+                        weights=[embeddings_matrix])
     x_content = embedding(content)
     x_title = embedding(title)
 
-    conv = Convolution1D(nb_filter=nb_filter,
-                            filter_length=filter_length,
-                            border_mode='valid',
-                            activation='relu',
-                            subsample_length=1)
-    x_content = conv(x_content)
-    x_title = conv(x_title)
+    #x_content = SpatialDropout1D(rate=0.3)(x_content)
+    #x_title = SpatialDropout1D(rate=0.3)(x_title)
 
-    x_content = GlobalMaxPooling1D()(x_content)
-    x_content = Dropout(0.5)(x_content)
-    x_title = GlobalMaxPooling1D()(x_title)
-    x_title = Dropout(0.5)(x_title)
+    conv1 = Convolution1D(filters=nb_filter,
+                            kernel_size=3,
+                            padding='valid',
+                            activation='relu')
+    x_content1 = conv1(x_content)
+    x_title1 = conv1(x_title)
+    x_content1 = GlobalMaxPooling1D()(x_content1)
+    x_content1 = Dropout(0.5)(x_content1)
+    x_title1 = GlobalMaxPooling1D()(x_title1)
+    x_title1 = Dropout(0.5)(x_title1)
 
-    x = merge([x_content, x_title, stars], mode='concat')
+    conv2 = Convolution1D(filters=nb_filter,
+                            kernel_size=5,
+                            padding='valid',
+                            activation='relu')
+    x_content2 = conv2(x_content)
+    x_title2 = conv2(x_title)
+    x_content2 = GlobalMaxPooling1D()(x_content2)
+    x_content2 = Dropout(0.5)(x_content2)
+    x_title2 = GlobalMaxPooling1D()(x_title2)
+    x_title2 = Dropout(0.5)(x_title2)
+
+    x = concatenate([x_content1, x_title1, x_content2, x_title2, stars])
     x = Dense(hidden_dims, activation='relu')(x)
     x = Dropout(0.5)(x)
 
     output = Dense(1, activation='sigmoid')(x)
 
-    model = Model(input=[content, title, stars], output=[output])
+    model = Model(inputs=[content, title, stars], outputs=[output])
     model.layers[2].trainable = False
 
     #optimizer = Adam(lr=0.0001)
@@ -104,7 +115,7 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
         batch_size = 64
         nb_epoch = 20
         auc_callback = AUCCallback()
-        history = model.fit([Xtrain_content, Xtrain_title, Xtrain_stars], Ytrain, batch_size=batch_size, nb_epoch=nb_epoch, validation_split=0.3, callbacks=[auc_callback])
+        history = model.fit([Xtrain_content, Xtrain_title, Xtrain_stars], Ytrain, batch_size=batch_size, epochs=nb_epoch, validation_split=0.3, callbacks=[auc_callback])
 
         f, axarr = plt.subplots(3, sharex=True)
         axarr[0].plot(range(1,nb_epoch + 1), history.history['loss'], 'b', range(1,nb_epoch + 1), history.history['val_loss'], 'r')
@@ -133,7 +144,7 @@ def predict(Xtrain, Ytrain, Xtest, embeddings_matrix, output_prefix, cross_valid
     else:
         batch_size = 64
         nb_epoch = 18
-        history = model.fit([Xtrain_content, Xtrain_title, Xtrain_stars], Ytrain, batch_size=batch_size, nb_epoch=nb_epoch)
+        history = model.fit([Xtrain_content, Xtrain_title, Xtrain_stars], Ytrain, batch_size=batch_size, epochs=nb_epoch)
 
     model_json = model.to_json()
     with open("models/" + output_prefix + ".json", "w") as json_file:
